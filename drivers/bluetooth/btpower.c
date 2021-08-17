@@ -206,6 +206,7 @@ static int pwr_state;
 static struct class *bt_class;
 static int bt_major;
 static int soc_id;
+static bool probe_finished;
 
 static int bt_vreg_enable(struct bt_power_vreg_data *vreg)
 {
@@ -1005,6 +1006,7 @@ static int bt_power_probe(struct platform_device *pdev)
 	if (btpower_get_tcs_table_info(pdev, bt_power_pdata) < 0)
 		pr_err("%s: Failed to get TCS table info\n", __func__);
 
+	probe_finished = true;
 	return 0;
 
 free_pdata:
@@ -1016,6 +1018,7 @@ static int bt_power_remove(struct platform_device *pdev)
 {
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 
+	probe_finished = false;
 	bluetooth_power_rfkill_remove(pdev);
 	bt_power_vreg_put();
 
@@ -1087,6 +1090,11 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int chipset_version = 0;
 	int itr, num_vregs;
 	struct bt_power_vreg_data *vreg_info = NULL;
+
+	if (!bt_power_pdata || !probe_finished) {
+		pr_err("%s: BTPower Probing Pending.Try Again\n", __func__);
+		return -EAGAIN;
+	}
 
 	switch (cmd) {
 	case BT_CMD_SLIM_TEST:
@@ -1217,6 +1225,7 @@ static int __init bluetooth_power_init(void)
 {
 	int ret = 0;
 
+	probe_finished = false;
 	ret = platform_driver_register(&bt_power_driver);
 	if (ret) {
 		pr_err("%s: platform_driver_register error: %d\n",
