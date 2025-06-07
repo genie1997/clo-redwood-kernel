@@ -39,6 +39,15 @@
 	memory { device_type = "memory"; reg = <0 0 0 0>; };
 	reserved_memory: reserved-memory { };
 
+	mem-offline {
+		compatible = "qcom,mem-offline";
+		offline-sizes = <0x1 0x40000000 0x0 0x40000000>,
+			<0x1 0xc0000000 0x0 0x80000000>,
+			<0x2 0xc0000000 0x1 0x40000000>;
+		granule = <512>;
+		mboxes = <&qmp_aop 0>;
+	};
+
 	aliases {
 			ufshc1 = &ufshc_mem; /* Embedded UFS Slot */
 			sdhc0 = &sdhc_1; /*SDC1 eMMC slot*/
@@ -477,13 +486,6 @@
 		size = <0x0 0x800000>;
 	};
 
-	dump_mem: mem_dump_region {
-		compatible = "shared-dma-pool";
-		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
-		reusable;
-		size = <0 0x2c00000>;
-	};
-
 	audio_cma_mem: audio_cma_region {
 		compatible = "shared-dma-pool";
 		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
@@ -500,14 +502,6 @@
 	dfps_data_memory: dfps_data_memory {
 		reg = <0x0 0xe3300000 0x0 0x0100000>;
 		label = "dfps_data_memory";
-	};
-
-	non_secure_display_memory: non_secure_display_region {
-		compatible = "shared-dma-pool";
-		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
-		reusable;
-		alignment = <0x0 0x400000>;
-		size = <0x0 0x6400000>;
 	};
 };
 
@@ -649,6 +643,7 @@
 
 	dcc: dcc_v2@117f000 {
 		compatible = "qcom,dcc-v2";
+		status = "disabled";
 		reg = <0x117f000 0x1000>,
 		      <0x1112000 0x6000>;
 
@@ -660,6 +655,7 @@
 
 	jtag_mm0: jtagmm@7040000 {
 		compatible = "qcom,jtagv8-mm";
+		status = "disabled";
 		reg = <0x7040000 0x1000>;
 		reg-names = "etm-base";
 
@@ -671,6 +667,7 @@
 
 	jtag_mm1: jtagmm@7140000 {
 		compatible = "qcom,jtagv8-mm";
+		status = "disabled";
 		reg = <0x7140000 0x1000>;
 		reg-names = "etm-base";
 
@@ -682,6 +679,7 @@
 
 	jtag_mm2: jtagmm@7240000 {
 		compatible = "qcom,jtagv8-mm";
+		status = "disabled";
 		reg = <0x7240000 0x1000>;
 		reg-names = "etm-base";
 
@@ -693,6 +691,7 @@
 
 	jtag_mm3: jtagmm@7340000 {
 		compatible = "qcom,jtagv8-mm";
+		status = "disabled";
 		reg = <0x7340000 0x1000>;
 		reg-names = "etm-base";
 
@@ -704,6 +703,7 @@
 
 	jtag_mm4: jtagmm@7440000 {
 		compatible = "qcom,jtagv8-mm";
+		status = "disabled";
 		reg = <0x7440000 0x1000>;
 		reg-names = "etm-base";
 
@@ -715,6 +715,7 @@
 
 	jtag_mm5: jtagmm@7540000 {
 		compatible = "qcom,jtagv8-mm";
+		status = "disabled";
 		reg = <0x7540000 0x1000>;
 		reg-names = "etm-base";
 
@@ -726,6 +727,7 @@
 
 	jtag_mm6: jtagmm@7640000 {
 		compatible = "qcom,jtagv8-mm";
+		status = "disabled";
 		reg = <0x7640000 0x1000>;
 		reg-names = "etm-base";
 
@@ -737,6 +739,7 @@
 
 	jtag_mm7: jtagmm@7740000 {
 		compatible = "qcom,jtagv8-mm";
+		status = "disabled";
 		reg = <0x7740000 0x1000>;
 		reg-names = "etm-base";
 
@@ -3143,7 +3146,7 @@
 
 	mem_dump {
 		compatible = "qcom,mem-dump";
-		memory-region = <&dump_mem>;
+		status = "disabled";
 
 		c0_context {
 			qcom,dump-size = <0x800>;
