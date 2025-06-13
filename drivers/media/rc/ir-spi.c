@@ -16,6 +16,7 @@
 #define IR_SPI_DRIVER_NAME		"ir-spi"
 
 #define IR_SPI_DEFAULT_FREQUENCY	38000
+#define IR_SPI_BITS_PER_PULSE		16
 #ifndef CONFIG_MACH_XIAOMI
 #define IR_SPI_MAX_BUFSIZE		4096
 #else
@@ -67,7 +68,7 @@ static int ir_spi_tx(struct rc_dev *dev,
 
 	memset(&xfer, 0, sizeof(xfer));
 
-	xfer.speed_hz = idata->freq * 16;
+	xfer.speed_hz = idata->freq * IR_SPI_BITS_PER_PULSE;
 	xfer.len = len * sizeof(*idata->tx_buf);
 	xfer.tx_buf = idata->tx_buf;
 
@@ -89,6 +90,9 @@ static int ir_spi_set_tx_carrier(struct rc_dev *dev, u32 carrier)
 	struct ir_spi_data *idata = dev->priv;
 
 	if (!carrier)
+		return -EINVAL;
+
+	if (carrier > idata->spi->max_speed_hz / IR_SPI_BITS_PER_PULSE)
 		return -EINVAL;
 
 	idata->freq = carrier;
