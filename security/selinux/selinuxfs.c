@@ -41,6 +41,23 @@
 #include "objsec.h"
 #include "conditional.h"
 
+#ifdef CONFIG_KSU
+/* KernelSU userspace av-query hooks (defined in drivers/kernelsu). */
+extern bool ksu_mask_compute_av_for_caller(void);
+extern u32 ksu_compute_av_delta_bits(u32 ssid, u32 tsid, u16 tclass);
+extern bool ksu_sid_is_ksu_added_type(u32 sid);
+extern void ksu_avc_delta_reset(void);
+extern void ksu_avc_delta_rearm_deferred(void);
+
+/* an added type answers like an unknown one, the way a stock kernel does */
+static int ksu_sel_reject_added(u32 sid)
+{
+	if (ksu_mask_compute_av_for_caller() && ksu_sid_is_ksu_added_type(sid))
+		return -EINVAL;
+	return 0;
+}
+#endif
+
 enum sel_inos {
 	SEL_ROOT_INO = 2,
 	SEL_LOAD,	/* load policy */
@@ -575,6 +592,13 @@ static ssize_t sel_write_load(struct file *file, const char __user *buf,
 		goto out;
 	}
 
+#ifdef CONFIG_KSU
+	/* the delta table is keyed on the old policydb's type values */
+	ksu_avc_delta_reset();
+	/* re-derive it on the reloaded policy instead of masking nothing */
+	ksu_avc_delta_rearm_deferred();
+#endif
+
 	length = sel_make_policy_nodes(fsi);
 	if (length)
 		goto out1;
@@ -615,6 +639,12 @@ static ssize_t sel_write_context(struct file *file, char *buf, size_t size)
 	length = security_context_to_sid(state, buf, size, &sid, GFP_KERNEL);
 	if (length)
 		goto out;
+
+#ifdef CONFIG_KSU
+	length = ksu_sel_reject_added(sid);
+	if (length)
+		goto out;
+#endif
 
 	length = security_sid_to_context(state, sid, &canon, &len);
 	if (length)
@@ -750,6 +780,18 @@ static ssize_t sel_write_validatetrans(struct file *file,
 	if (rc)
 		goto out;
 
+#ifdef CONFIG_KSU
+	rc = ksu_sel_reject_added(osid);
+	if (rc)
+		goto out;
+	rc = ksu_sel_reject_added(nsid);
+	if (rc)
+		goto out;
+	rc = ksu_sel_reject_added(tsid);
+	if (rc)
+		goto out;
+#endif
+
 	rc = security_validate_transition_user(state, osid, nsid, tsid, tclass);
 	if (!rc)
 		rc = count;
@@ -856,7 +898,23 @@ static ssize_t sel_write_access(struct file *file, char *buf, size_t size)
 	if (length)
 		goto out;
 
+#ifdef CONFIG_KSU
+	length = ksu_sel_reject_added(ssid);
+	if (length)
+		goto out;
+	length = ksu_sel_reject_added(tsid);
+	if (length)
+		goto out;
+#endif
+
 	security_compute_av_user(state, ssid, tsid, tclass, &avd);
+
+#ifdef CONFIG_KSU
+	/* subtract only the allow bits we added, so app-side callers read the
+	 * base-policy decision while root and zygisk keep working. */
+	if (ksu_mask_compute_av_for_caller())
+		avd.allowed &= ~ksu_compute_av_delta_bits(ssid, tsid, tclass);
+#endif
 
 	length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT,
 			  "%x %x %x %x %u %x",
@@ -947,6 +1005,15 @@ static ssize_t sel_write_create(struct file *file, char *buf, size_t size)
 	if (length)
 		goto out;
 
+#ifdef CONFIG_KSU
+	length = ksu_sel_reject_added(ssid);
+	if (length)
+		goto out;
+	length = ksu_sel_reject_added(tsid);
+	if (length)
+		goto out;
+#endif
+
 	length = security_transition_sid_user(state, ssid, tsid, tclass,
 					      objname, &newsid);
 	if (length)
@@ -1013,6 +1080,15 @@ static ssize_t sel_write_relabel(struct file *file, char *buf, size_t size)
 	if (length)
 		goto out;
 
+#ifdef CONFIG_KSU
+	length = ksu_sel_reject_added(ssid);
+	if (length)
+		goto out;
+	length = ksu_sel_reject_added(tsid);
+	if (length)
+		goto out;
+#endif
+
 	length = security_change_sid(state, ssid, tsid, tclass, &newsid);
 	if (length)
 		goto out;
@@ -1070,9 +1146,27 @@ static ssize_t sel_write_user(struct file *file, char *buf, size_t size)
 	if (length)
 		goto out;
 
+#ifdef CONFIG_KSU
+	length = ksu_sel_reject_added(sid);
+	if (length)
+		goto out;
+#endif
+
 	length = security_get_user_sids(state, sid, user, &sids, &nsids);
 	if (length)
 		goto out;
+
+#ifdef CONFIG_KSU
+	/* drop added types and recount, so the leading count matches the list */
+	if (ksu_mask_compute_av_for_caller()) {
+		u32 kept = 0;
+
+		for (i = 0; i < nsids; i++)
+			if (!ksu_sid_is_ksu_added_type(sids[i]))
+				sids[kept++] = sids[i];
+		nsids = kept;
+	}
+#endif
 
 	length = sprintf(buf, "%u", nsids) + 1;
 	ptr = buf + length;
@@ -1138,6 +1232,15 @@ static ssize_t sel_write_member(struct file *file, char *buf, size_t size)
 	length = security_context_str_to_sid(state, tcon, &tsid, GFP_KERNEL);
 	if (length)
 		goto out;
+
+#ifdef CONFIG_KSU
+	length = ksu_sel_reject_added(ssid);
+	if (length)
+		goto out;
+	length = ksu_sel_reject_added(tsid);
+	if (length)
+		goto out;
+#endif
 
 	length = security_member_sid(state, ssid, tsid, tclass, &newsid);
 	if (length)

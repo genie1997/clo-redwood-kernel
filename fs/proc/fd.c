@@ -13,10 +13,21 @@
 #include <linux/fs.h>
 
 #include <linux/proc_fs.h>
+#if defined(CONFIG_KSU_SUSFS_SUS_MOUNT) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
+#include <linux/susfs_def.h>
+#endif // #if defined(CONFIG_KSU_SUSFS_SUS_MOUNT) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
 
 #include "../mount.h"
 #include "internal.h"
 #include "fd.h"
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+extern int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt);
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+extern int susfs_open_redirect_spoof_seq_show(struct inode *inode, int *out_mnt_id, unsigned long *out_ino);
+#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 
 static int seq_show(struct seq_file *m, void *v)
 {
@@ -24,6 +35,11 @@ static int seq_show(struct seq_file *m, void *v)
 	int f_flags = 0, ret = -ENOENT;
 	struct file *file = NULL;
 	struct task_struct *task;
+	int mnt_id;
+	unsigned long ino;
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	struct mount *mnt;
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 
 	task = get_proc_task(m->private);
 	if (!task)
@@ -54,10 +70,25 @@ static int seq_show(struct seq_file *m, void *v)
 	if (ret)
 		return ret;
 
+	mnt_id = real_mount(file->f_path.mnt)->mnt_id;
+	ino = file_inode(file)->i_ino;
+
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	/* leaves both alone unless it holds an entry for this inode */
+	if (SUSFS_IS_INODE_OPEN_REDIRECT(file_inode(file)))
+		susfs_open_redirect_spoof_seq_show(file_inode(file), &mnt_id, &ino);
+#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	/* mount not in the task's table; report the nearest visible ancestor */
+	mnt = real_mount(file->f_path.mnt);
+	if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
+	    susfs_is_sus_mnt_hidden_from_current())
+		mnt_id = susfs_get_non_sus_mnt_id_from_mnt(mnt);
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+
 	seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\nino:\t%lu\n",
-		   (long long)file->f_pos, f_flags,
-		   real_mount(file->f_path.mnt)->mnt_id,
-		   file_inode(file)->i_ino);
+		   (long long)file->f_pos, f_flags, mnt_id, ino);
 
 	show_fd_locks(m, file, files);
 	if (seq_has_overflowed(m))

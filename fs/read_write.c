@@ -25,6 +25,12 @@
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
 
+#ifdef CONFIG_KSU
+#include <linux/jump_label.h>
+/* defined in ksud_integration.c; see the call site in ksys_read() */
+DECLARE_STATIC_KEY_TRUE(ksu_sys_read_hook_key);
+#endif
+
 const struct file_operations generic_ro_fops = {
 	.llseek		= generic_file_llseek,
 	.read_iter	= generic_file_read_iter,
@@ -577,6 +583,15 @@ ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
 {
 	struct fd f = fdget_pos(fd);
 	ssize_t ret = -EBADF;
+
+#ifdef CONFIG_KSU
+	/* only needed for pid 1 while init.rc is read at boot; gated behind a static
+	 * key that on_post_fs_data() retires, after which the call site is a nop. */
+	if (static_branch_unlikely(&ksu_sys_read_hook_key)) {
+		extern void ksu_handle_sys_read(unsigned int fd);
+		ksu_handle_sys_read(fd);
+	}
+#endif
 
 	if (f.file) {
 		loff_t pos, *ppos = file_ppos(f.file);
