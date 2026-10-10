@@ -2900,11 +2900,11 @@ static int auto_test_open(struct inode *inode, struct file *file)
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
-static const struct proc_ops auto_test_ops = {
-	.proc_open = auto_test_open,
-	.proc_read = seq_read,
-	.proc_lseek = seq_lseek,
-	.proc_release = single_release,
+static const struct file_operations auto_test_ops = {
+	.open = auto_test_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
 };
 #else
 static const struct file_operations auto_test_ops = {

@@ -964,11 +964,12 @@ static int32_t last_touch_events_open(struct inode *inode, struct file *file)
 	return seq_open(file, &last_touch_events_seq_ops);
 }
 
-struct proc_ops last_touch_events_ops = {
-	.proc_open = last_touch_events_open,
-	.proc_read = seq_read,
-	.proc_lseek = seq_lseek,
-	.proc_release = seq_release,
+struct file_operations last_touch_events_ops = {
+	.owner = THIS_MODULE,
+	.open = last_touch_events_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
 };
 
 static int xiaomi_touch_probe(struct platform_device *pdev)
