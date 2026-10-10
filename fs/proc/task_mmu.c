@@ -397,8 +397,7 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 			pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
 			start = vma->vm_start;
 			end = VMA_PAD_START(vma);
-			if (show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino))
-				return;
+			show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
 			goto done;
 		}
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
