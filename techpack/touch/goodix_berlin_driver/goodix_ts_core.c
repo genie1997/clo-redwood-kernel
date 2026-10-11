@@ -2463,6 +2463,7 @@ static void goodix_set_game_work(struct work_struct *work)
 			temp_value = xm_intf.touch_mode[Touch_Edge_Filter][SET_CUR_VALUE];
 			data1 &= 0x3F;
 			data1 |= (temp_value << 6);
+			break;
 		case Touch_Expert_Mode:
 			temp_value = xm_intf.touch_mode[Touch_Expert_Mode][SET_CUR_VALUE];
 			break;
