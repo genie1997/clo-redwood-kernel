@@ -578,6 +578,7 @@ struct goodix_ts_core {
 	int charger_status;
 	int palm_status;
 	int report_rate;
+	bool game_mode_set;
 	bool tp_pm_suspend;
 
 	struct completion pm_resume_completion;

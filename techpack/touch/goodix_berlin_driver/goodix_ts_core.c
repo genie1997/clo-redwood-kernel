@@ -1969,6 +1969,14 @@ out:
 	if (core_data->palm_status)
 		ret = hw_ops->palm_on(core_data, core_data->palm_status);
 
+	/* restore high report rate */
+	if (core_data->report_rate == 480)
+		hw_ops->switch_report_rate(core_data, true);
+
+	/* restore game mode */
+	if (core_data->game_mode_set)
+		queue_work(core_data->game_wq, &core_data->game_work);
+
 	/* enable irq */
 	hw_ops->irq_enable(core_data, true);
 	/* open esd */
@@ -2402,6 +2410,7 @@ static void goodix_set_game_work(struct work_struct *work)
 	bool on = false;
 	int ret = 0, i = 0;
 
+	goodix_core_data->game_mode_set = true;
 	if (goodix_core_data->work_status == TP_SLEEP) {
 		ts_info("suspended, skip");
 		return;
