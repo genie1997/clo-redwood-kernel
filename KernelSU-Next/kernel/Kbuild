@@ -1,5 +1,4 @@
-# 5.4 compat: only reference ->iterate if this tree's struct file_operations has it
-# (Scarlet 5.4 backported mainline's removal -> only ->iterate_shared exists).
+# only reference ->iterate if this tree's struct file_operations still has it
 ifeq ($(shell grep -q "(\*iterate)" $(srctree)/include/linux/fs.h && echo yes),yes)
 ccflags-y += -DKSU_HAS_FOP_ITERATE
 endif

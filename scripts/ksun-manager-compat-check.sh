@@ -1,26 +1,16 @@
 #!/usr/bin/env bash
-# Check whether our advertised manager UAPI can be bumped to match a given
-# KernelSU-Next manager release without a real backport.
-#
-# The manager marks the kernel "supported" only when the UAPI integer it reads
-# back (KSU_IOCTL_GET_INFO -> uapi_version) equals the one baked into the APK.
-# That integer is only safe to raise if the manager-facing ioctl ABI (the structs
-# and command numbers in uapi/) is otherwise unchanged. This diffs the two,
-# ignoring cosmetic noise (comments, #define vs static const, whitespace, the
-# version define itself, and field/enum *names*, since a rename keeps the layout)
-# leaves any real change for review.
-#
+# Diff the uapi/ ABI against a KernelSU-Next manager tag before raising KSU_MANAGER_COMPAT_UAPI.
 # Usage: ksun-manager-compat-check.sh [upstream-repo] [manager-ref]
 #   upstream-repo  a local KernelSU-Next checkout (or set $KSUN_REF)
 #   manager-ref    a manager tag; defaults to the newest v*.*.* tag
 set -eu
 
 here="$(cd "$(dirname "$0")" && pwd)"
-our_uapi="$here/../KernelSU-Next/uapi"
+kernel_uapi="$here/../KernelSU-Next/uapi"
 up="${1:-${KSUN_REF:-}}"
 ref="${2:-}"
 
-[ -n "$up" ] || { sed -n '2,16p' "$0" >&2; exit 2; }
+[ -n "$up" ] || { sed -n '3,5p' "$0" >&2; exit 2; }
 [ -d "$up/.git" ] || { echo "not a git repo: $up" >&2; exit 2; }
 git -C "$up" fetch --tags --quiet origin >/dev/null 2>&1 || true
 [ -n "$ref" ] || ref="$(git -C "$up" tag | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
@@ -65,18 +55,18 @@ echo "Manager repo:        $up"
 echo "Manager ref:         $ref"
 mgr_uapi="$(git -C "$up" show "$ref:uapi/supercall.h" | sed -nE 's/.*KERNEL_SU_UAPI_VERSION[^0-9]*([0-9]+).*/\1/p' | tail -1)"
 kbuild="$here/../KernelSU-Next/kernel/Kbuild"
-our_adv="$(sed -nE 's/.*KSU_MANAGER_COMPAT_UAPI[^0-9]*([0-9]+).*/\1/p' "$kbuild" | tail -1)"
+kernel_adv="$(sed -nE 's/.*KSU_MANAGER_COMPAT_UAPI[^0-9]*([0-9]+).*/\1/p' "$kbuild" | tail -1)"
 echo "Manager UAPI:        ${mgr_uapi:-?}"
-echo "Our advertised UAPI: ${our_adv:-?}  (KSU_MANAGER_COMPAT_UAPI in KernelSU-Next/kernel/Kbuild)"
+echo "Kernel UAPI:         ${kernel_adv:-?}  (KSU_MANAGER_COMPAT_UAPI in KernelSU-Next/kernel/Kbuild)"
 echo
 
 changed=0
 for h in $headers; do
-    a="$(normalize < "$our_uapi/$h")"
+    a="$(normalize < "$kernel_uapi/$h")"
     b="$(git -C "$up" show "$ref:uapi/$h" | normalize)"
     if [ "$a" != "$b" ]; then
         changed=1
-        echo "### wire-ABI change in uapi/$h  (ours < | manager >)"
+        echo "### wire-ABI change in uapi/$h  (kernel < | manager >)"
         diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") || true
         echo
     fi
